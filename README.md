@@ -1,6 +1,6 @@
-# Mini Project 2 - Chitty-Chat
+# Mini Project 2—Chitty-Chat
 
-## Description: ##
+## Description ##
 You have to implement Chitty-Chat a distributed system, that is providing a chatting service, and keeps track of logical time using Lamport Timestamps.
 
 We call clients of the Chitty-Chat service Participants. 
@@ -21,7 +21,7 @@ A "Participant X  joined Chitty-Chat at Lamport time L" message is broadcast whe
 
 A "Participant X left Chitty-Chat at Lamport time L" message is broadcast when Participant X leaves to all remaining Participants.
 
-## Technical Requirements: ##
+## Technical Requirements ##
 1. Use gRPC for all message passing between nodes
 2. Use Golang to implement the service and clients
 3. Every client has to be deployed as a separate processes
@@ -31,7 +31,7 @@ A "Participant X left Chitty-Chat at Lamport time L" message is broadcast when P
 7. Demonstrate that a client node can leave the system
 8. Optional: All elements of the Chitty-Chat service are deployed as Docker containers
 
-## Hand-in requirements: ##
+## Hand-in requirements ##
 1. Hand in a single report in a pdf file
 2. Describe your system architecture - do you have a server-client architecture, peer to peer, or something else?
 3. Describe what  RPC methods are implemented: Publish(), Broadcast(), any other ?
