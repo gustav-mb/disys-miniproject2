@@ -1,0 +1,45 @@
+syntax = "proto3";
+
+option go_package = "./chatpb";
+
+package ChittyChat;
+
+// Tutorial:
+// https://medium.com/@viethapascal/golang-grpc-part-2-simple-chat-application-with-grpc-ef6a6c0eea32
+// https://www.youtube.com/watch?v=mML6GiOAM1w
+
+// protoc -I="." --go_out="." "chatpb/chat.proto"
+// protoc --go-grpc_out="." chatpb/chat.proto
+
+// go install google.golang.org/protobuf/cmd/protoc-gen-go@latest
+// go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@latest
+
+message User {
+    string id = 1;
+    string name = 2;
+    string password = 3;
+}
+
+message Message {
+    User user = 1;
+    string content = 2;
+    string timestamp = 3;
+}
+
+message Connect {
+    User user = 1;
+    bool active = 2;
+}
+
+message Close {}
+message Done {}
+
+service Broadcast {
+    rpc CreateStream (Connect) returns (stream Message);    // Initiate connection to BroadcastServer and return stream of messages.
+    rpc DeleteStream (User) returns (Close);                // Delete a stream connection
+    rpc DisconnectStream (User) returns (Close);            // Disconnect user from stream.
+    rpc ConnectStream (User) returns (Done);                // Connect user to stream.
+    rpc Broadcast (Message) returns (Close);                // Send message to all users.
+    rpc Publish (Message) returns (Done);
+}
+
