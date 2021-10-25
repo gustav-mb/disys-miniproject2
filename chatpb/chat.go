@@ -4,14 +4,14 @@ import fmt "fmt"
 
 const Port = "8080"
 const Line = "-------------------------------------------------------"
-const MaxStrLength = 128
+const MaxMsgLength = 128
 
 type Command struct {
-	Name string
+	Name        string
 	Description string
 }
 
-var Commands = [4]*Command {
+var Commands = [4]*Command{
 	{"help", "Shows all available commands."},
 	{"disconnect", "Disconnects you from the server."},
 	{"connect", "Reconnects you to the server."},

@@ -30,21 +30,25 @@ func main() {
 	// Parse commandline arguments as '-name <username> -password <password> -server <port>'
 	name := flag.String("name", "Anonymous", "The name of the user")
 	password := flag.String("password", "admin", "The password for the user")
-	port := flag.String("server", pb.Port, "Server port")
+	address := flag.String("ip", "localhost", "The ip address to the server")
+	port := flag.String("server", pb.Port, "The port on the ip address")
 	flag.Parse()
 
 	// Create user
 	user := newUser(name, password)
 
-	// Connect to Client to Server
-	conn, err := grpc.Dial("localhost:"+*port, grpc.WithInsecure())
+	pb.ShowLogo()
+	fmt.Printf("Welcome, %v!\n", user.Name)
+	fmt.Println()
+
+	// Connect Client to Server
+	conn, err := grpc.Dial(*address+":"+*port, grpc.WithInsecure())
 	if err != nil {
 		log.Fatalf("Could not connect to server. :: %v", err)
 	}
 
 	client = pb.NewBroadcastClient(conn)
-
-	pb.ShowLogo()
+	
 	connect(user)
 
 	wait.Add(1)
@@ -60,7 +64,6 @@ func main() {
 // Creates a message stream to the server
 func connect(user *pb.User) {
 	fmt.Println("Connecting to server...")
-
 	stream, err := client.CreateStream(context.Background(), &pb.Connect{
 		User:   user,
 		Active: true,
@@ -141,8 +144,8 @@ func startCommandShell(user *pb.User) {
 				fmt.Println("Unknown command. Type /help to show a list of commands.")
 				continue
 			}
-		} else if len(input) > pb.MaxStrLength {
-			fmt.Printf("Error: Exceeding maximum message length of %v characters :: length: %v\n", pb.MaxStrLength, len(input))
+		} else if len(input) > pb.MaxMsgLength {
+			fmt.Printf("Error: Exceeding maximum message length of %v characters :: length: %v\n", pb.MaxMsgLength, len(input))
 			continue
 		}
 

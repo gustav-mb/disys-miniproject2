@@ -2,21 +2,42 @@
 
 ## How to run
 
+First run the Server, then Clients
+
 ### Server
 
-Run server.go in its directory with:
+To start the server, run ´server.go´ in its directory with:
 > `go run .`
 
-A port can also be specified by writing:
+The server can also be started with arguments to specify e.g. which port it has to be run on.
+This can be done by writing:
 
 > `go run . -port <port>`
 
+E.g. to run the server on port 5000 write:
+
+> `go run . -port 5000`
+
+If no argument is provided it will start on a standard port.
+
 ### Client
 
-Run client.go in its directory with:
-> `go run . -name <name>`
+To start a client, run `client.go` in its directory with:
+> `go run .`
 
-### Script
+The client can also started with arguments to specify e.g.
+
+- The display name of the client in chat
+- The password for the client
+- The ip address of the server the client connects to
+- The port the client have to connect through
+
+E.g. to create a client with the name "Agata", with password "123", ip address of server being 192.168.0.1 on port 5000, write:
+> `go run . -name Agata -password 123 -ip 192.168.0.1 -port 5000`
+
+If no arguments are provided it will pick a standard name, password, and port. The ip address will be set to "localhost".
+
+### Script (Windows only)
 
 Chitty-Chat can also be run with a PowerShell script for easy creation of server and clients.
 
@@ -24,7 +45,9 @@ To run the predefined script run:
 > `run.ps1`
 
 You can also specify how many clients to connect to the server by writing:
-> `run.ps1 -p <clients>`
+> `run.ps1 -p <number of clients>`
+
+If no argument is provided it will start the server with 4 clients.
 
 ---
 
