@@ -25,12 +25,14 @@ If no argument is provided it will start on a standard port.
 To start a client, run `client.go` in its directory with:
 > `go run .`
 
-The client can also started with arguments to specify e.g.
+The client can also be started with arguments to specify e.g.
 
 - The display name of the client in chat
 - The password for the client
 - The ip address of the server the client connects to
 - The port the client have to connect through
+
+> `go run . -name <name> -password <password> -ip <address> -port <port>`
 
 E.g. to create a client with the name "Agata", with password "123", ip address of server being 192.168.0.1 on port 5000, write:
 > `go run . -name Agata -password 123 -ip 192.168.0.1 -port 5000`
