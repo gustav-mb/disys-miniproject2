@@ -1,8 +1,8 @@
-module chittyChat
+module server
 
 go 1.17
 
-replace chatpb => ./chatpb
+replace chatpb => ../chatpb
 
 require (
 	chatpb v0.0.0-00010101000000-000000000000
