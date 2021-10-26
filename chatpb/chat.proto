@@ -8,16 +8,17 @@ package ChittyChat;
 // https://medium.com/@viethapascal/golang-grpc-part-2-simple-chat-application-with-grpc-ef6a6c0eea32
 // https://www.youtube.com/watch?v=mML6GiOAM1w
 
-// protoc -I="." --go_out="." "chatpb/chat.proto"
-// protoc --go-grpc_out="." chatpb/chat.proto
-
+// Install libraries
 // go install google.golang.org/protobuf/cmd/protoc-gen-go@latest
 // go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@latest
+
+// Compile protofile with:
+// protoc -I="." --go_out="." "chatpb/chat.proto"
+// protoc --go-grpc_out="." chatpb/chat.proto
 
 message User {
     string id = 1;
     string name = 2;
-    string password = 3;
 }
 
 message Message {
@@ -36,10 +37,8 @@ message Done {}
 
 service Broadcast {
     rpc CreateStream (Connect) returns (stream Message);    // Initiate connection to BroadcastServer and return stream of messages.
-    rpc DeleteStream (User) returns (Close);                // Delete a stream connection
     rpc DisconnectStream (User) returns (Close);            // Disconnect user from stream.
     rpc ConnectStream (User) returns (Done);                // Connect user to stream.
     rpc Broadcast (Message) returns (Close);                // Send message to all users.
-    rpc Publish (Message) returns (Done);
+    rpc Publish (Message) returns (Done);                   // Send message to server.
 }
-

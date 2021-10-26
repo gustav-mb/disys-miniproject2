@@ -37,6 +37,7 @@ type Server struct {
 
 func main() {
 	// Parse commandline arguments
+	// go run . -port
 	port := flag.String("port", pb.Port, "Server port")
 	flag.Parse()
 
@@ -49,9 +50,9 @@ func main() {
 	log.Printf("Listening at port: " + *port)
 
 	// Create gRPC server instance
-	grpcServer := grpc.NewServer(grpc.StatsHandler(&Handler{}))
+	grpcServer := grpc.NewServer()
 
-	// Create chat server instance
+	// Create chat service instance
 	server := &Server{Connections: make([]*Connection, 0)}
 
 	// Register the server service
@@ -63,6 +64,8 @@ func main() {
 	if err != nil {
 		log.Fatalf("Failed to start gRPC server :: %v", err)
 	}
+
+	go server.checkConnections()
 }
 
 // Create a connection from Server to Client and save the connection in the server.
@@ -137,6 +140,21 @@ func (s *Server) Publish(ctx context.Context, msg *pb.Message) (*pb.Done, error)
 	_, err := s.Broadcast(ctx, msg)
 
 	return &pb.Done{}, err
+}
+
+func (s *Server) checkConnections() {
+	lastResult := make([]bool, 0, len(s.Connections))
+
+	for _, v := range lastResult {
+		log.Println(v)
+	}
+
+	// Copy values
+	for i, c := range s.Connections {
+		if c.active != lastResult[i] {
+			//log.Println("Value changed")
+		}
+	}
 }
 
 // Broadcast a message to all clients on the server.

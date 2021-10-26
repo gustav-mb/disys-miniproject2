@@ -27,16 +27,16 @@ func init() {
 }
 
 func main() {
-	// Parse commandline arguments as '-name <username> -password <password> -server <port>'
+	// Parse commandline arguments as '-name <username> -ip <ip address> -server <port>'
 	name := flag.String("name", "Anonymous", "The name of the user")
-	password := flag.String("password", "admin", "The password for the user")
 	address := flag.String("ip", "localhost", "The ip address to the server")
-	port := flag.String("server", pb.Port, "The port on the ip address")
+	port := flag.String("port", pb.Port, "The port on the ip address")
 	flag.Parse()
 
 	// Create user
-	user := newUser(name, password)
+	user := newUser(name)
 
+	// Print client welcome message
 	pb.ShowLogo()
 	fmt.Printf("Welcome, %v!\n", user.Name)
 	fmt.Println()
@@ -46,9 +46,10 @@ func main() {
 	if err != nil {
 		log.Fatalf("Could not connect to server. :: %v", err)
 	}
+	defer conn.Close()
 
+	// Create client stub to perform RPCs
 	client = pb.NewBroadcastClient(conn)
-	
 	connect(user)
 
 	wait.Add(1)
@@ -190,16 +191,10 @@ func receiveMessage(stream pb.Broadcast_CreateStreamClient) {
 }
 
 // Create and return a User with an unique id, a specified name and password.
-func newUser(name *string, password *string) *pb.User {
+func newUser(name *string) *pb.User {
 	id := sha256.Sum256([]byte(time.Now().String() + *name))
 	return &pb.User{
-		Id:       hex.EncodeToString(id[:]),
-		Name:     *name,
-		Password: *password,
+		Id:   hex.EncodeToString(id[:]),
+		Name: *name,
 	}
 }
-
-// NOT IMPLEMENTED YET
-// func logMessage() {
-
-// }

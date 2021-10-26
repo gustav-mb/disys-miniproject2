@@ -25,7 +25,7 @@ for ($i = 0; $i -lt $p; $i++) {
     $Command = 'cmd /c start powershell -NoExit -Command {
         $host.UI.RawUI.WindowTitle = "Client - ' + $name + '";
         cd client; 
-        go run . -name ' + $name +' -server ' + $port +';
+        go run . -name ' + $name +' -port ' + $port +';
     }'
     
     invoke-expression -Command $Command

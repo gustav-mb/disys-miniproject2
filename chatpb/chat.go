@@ -35,7 +35,8 @@ func Help() {
 	fmt.Println(Line)
 	fmt.Println("HELP")
 	fmt.Println("To execute a command, start by writing a forward slash (/) followed by the command name.")
-	fmt.Println("AVAILABLE COMMANDS")
+	fmt.Println()
+	fmt.Println("AVAILABLE COMMANDS:")
 	for _, command := range Commands {
 		fmt.Printf("- %v - %v\n", command.Name, command.Description)
 	}

@@ -19,7 +19,6 @@ const _ = grpc.SupportPackageIsVersion7
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type BroadcastClient interface {
 	CreateStream(ctx context.Context, in *Connect, opts ...grpc.CallOption) (Broadcast_CreateStreamClient, error)
-	DeleteStream(ctx context.Context, in *User, opts ...grpc.CallOption) (*Close, error)
 	DisconnectStream(ctx context.Context, in *User, opts ...grpc.CallOption) (*Close, error)
 	ConnectStream(ctx context.Context, in *User, opts ...grpc.CallOption) (*Done, error)
 	Broadcast(ctx context.Context, in *Message, opts ...grpc.CallOption) (*Close, error)
@@ -66,15 +65,6 @@ func (x *broadcastCreateStreamClient) Recv() (*Message, error) {
 	return m, nil
 }
 
-func (c *broadcastClient) DeleteStream(ctx context.Context, in *User, opts ...grpc.CallOption) (*Close, error) {
-	out := new(Close)
-	err := c.cc.Invoke(ctx, "/ChittyChat.Broadcast/DeleteStream", in, out, opts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
 func (c *broadcastClient) DisconnectStream(ctx context.Context, in *User, opts ...grpc.CallOption) (*Close, error) {
 	out := new(Close)
 	err := c.cc.Invoke(ctx, "/ChittyChat.Broadcast/DisconnectStream", in, out, opts...)
@@ -95,7 +85,7 @@ func (c *broadcastClient) ConnectStream(ctx context.Context, in *User, opts ...g
 
 func (c *broadcastClient) Broadcast(ctx context.Context, in *Message, opts ...grpc.CallOption) (*Close, error) {
 	out := new(Close)
-	err := c.cc.Invoke(ctx, "/ChittyChat.Broadcast/broadcast", in, out, opts...)
+	err := c.cc.Invoke(ctx, "/ChittyChat.Broadcast/Broadcast", in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -116,7 +106,6 @@ func (c *broadcastClient) Publish(ctx context.Context, in *Message, opts ...grpc
 // for forward compatibility
 type BroadcastServer interface {
 	CreateStream(*Connect, Broadcast_CreateStreamServer) error
-	DeleteStream(context.Context, *User) (*Close, error)
 	DisconnectStream(context.Context, *User) (*Close, error)
 	ConnectStream(context.Context, *User) (*Done, error)
 	Broadcast(context.Context, *Message) (*Close, error)
@@ -130,9 +119,6 @@ type UnimplementedBroadcastServer struct {
 
 func (UnimplementedBroadcastServer) CreateStream(*Connect, Broadcast_CreateStreamServer) error {
 	return status.Errorf(codes.Unimplemented, "method CreateStream not implemented")
-}
-func (UnimplementedBroadcastServer) DeleteStream(context.Context, *User) (*Close, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method DeleteStream not implemented")
 }
 func (UnimplementedBroadcastServer) DisconnectStream(context.Context, *User) (*Close, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method DisconnectStream not implemented")
@@ -178,24 +164,6 @@ type broadcastCreateStreamServer struct {
 
 func (x *broadcastCreateStreamServer) Send(m *Message) error {
 	return x.ServerStream.SendMsg(m)
-}
-
-func _Broadcast_DeleteStream_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(User)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(BroadcastServer).DeleteStream(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: "/ChittyChat.Broadcast/DeleteStream",
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(BroadcastServer).DeleteStream(ctx, req.(*User))
-	}
-	return interceptor(ctx, in, info, handler)
 }
 
 func _Broadcast_DisconnectStream_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
@@ -244,7 +212,7 @@ func _Broadcast_Broadcast_Handler(srv interface{}, ctx context.Context, dec func
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: "/ChittyChat.Broadcast/broadcast",
+		FullMethod: "/ChittyChat.Broadcast/Broadcast",
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(BroadcastServer).Broadcast(ctx, req.(*Message))
@@ -278,10 +246,6 @@ var Broadcast_ServiceDesc = grpc.ServiceDesc{
 	HandlerType: (*BroadcastServer)(nil),
 	Methods: []grpc.MethodDesc{
 		{
-			MethodName: "DeleteStream",
-			Handler:    _Broadcast_DeleteStream_Handler,
-		},
-		{
 			MethodName: "DisconnectStream",
 			Handler:    _Broadcast_DisconnectStream_Handler,
 		},
@@ -290,7 +254,7 @@ var Broadcast_ServiceDesc = grpc.ServiceDesc{
 			Handler:    _Broadcast_ConnectStream_Handler,
 		},
 		{
-			MethodName: "broadcast",
+			MethodName: "Broadcast",
 			Handler:    _Broadcast_Broadcast_Handler,
 		},
 		{
