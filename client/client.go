@@ -17,9 +17,13 @@ import (
 	"google.golang.org/grpc"
 )
 
+var user *pb.User
 var client pb.BroadcastClient
 var wait *sync.WaitGroup
 var done chan int
+
+// Lamport clock
+var t int32
 
 func init() {
 	wait = &sync.WaitGroup{}
@@ -34,7 +38,7 @@ func main() {
 	flag.Parse()
 
 	// Create user
-	user := newUser(name)
+	user = newUser(name)
 
 	// Print client welcome message
 	pb.ShowLogo()
@@ -70,6 +74,8 @@ func connect(user *pb.User) {
 		Active: true,
 	})
 
+	t++
+
 	if err != nil {
 		log.Fatalf("Connection failed. :: %v", err)
 	}
@@ -82,38 +88,18 @@ func connect(user *pb.User) {
 	go receiveMessage(stream)
 }
 
-// Mute the client from receiving messages.
-func disconnect(user *pb.User) {
-	fmt.Println(pb.Line)
-	log.Println("Disconnecting from server...")
-	var _, err = client.DisconnectStream(context.Background(), user)
-	if err != nil {
-		fmt.Println(err)
-	} else {
-		log.Println("Done.")
-	}
-	fmt.Println(pb.Line)
-}
-
-// Unmute the client from receiving messages.
-func reconnect(user *pb.User) {
-	fmt.Println(pb.Line)
-	log.Println("Connecting to server...")
-	var _, err = client.ConnectStream(context.Background(), user)
-	if err != nil {
-		fmt.Println(err)
-	} else {
-		log.Println("Done.")
-	}
-
-	fmt.Println(pb.Line)
-}
-
-// Mute the client from receiving messages and terminate the process.
+// Disconnect client and end process
 func exit(user *pb.User) {
 	fmt.Println(pb.Line)
 	log.Println("Exitting client...")
-	client.DisconnectStream(context.Background(), user)
+	t++
+	client.DisconnectStream(context.Background(), &pb.Message{
+		User: user,
+		Content: "Exit request",
+		Timestamp: time.Now().String(),
+		Lamport: t,
+	})
+	
 	log.Println("Done.")
 	fmt.Println(pb.Line)
 	close(done)
@@ -132,12 +118,6 @@ func startCommandShell(user *pb.User) {
 			switch input {
 			case "/exit":
 				exit(user)
-			case "/connect":
-				reconnect(user)
-				continue
-			case "/disconnect":
-				disconnect(user)
-				continue
 			case "/help":
 				pb.Help()
 				continue
@@ -163,7 +143,12 @@ func sendMessage(user *pb.User, content string) error {
 		User:      user,
 		Content:   content,
 		Timestamp: time.Now().String(),
+		Lamport:   t,
 	}
+
+	log.Printf("(%v, Send) Publishing message '%v' to server\n", msg.Lamport, msg.Content)
+
+	msg.Lamport++
 
 	_, err := client.Publish(context.Background(), msg)
 
@@ -186,7 +171,14 @@ func receiveMessage(stream pb.Broadcast_CreateStreamClient) {
 			break
 		}
 
-		log.Printf("%v: %s\n", msg.User.Name, msg.Content)
+		if t == 1 {
+			log.Printf("(C-Send: %v | S-Broadcast: %v) %v: %s\n", t, msg.Lamport, msg.User.Name, msg.Content)
+		} else {
+			log.Printf("(S-Broadcast: %v) %v: %s\n", msg.Lamport, msg.User.Name, msg.Content)
+		}
+		
+
+		t = pb.MaxLamport(msg.Lamport, t) + 1
 	}
 }
 
