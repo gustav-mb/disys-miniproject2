@@ -10,15 +10,17 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"os/signal"
 	"strings"
 	"sync"
+	"syscall"
 	"time"
+	utils "utils"
 
 	"google.golang.org/grpc"
 )
 
-var user *pb.User
-var client pb.BroadcastClient
+var client pb.ChittyChatClient
 var wait *sync.WaitGroup
 var done chan int
 
@@ -34,14 +36,18 @@ func main() {
 	// Parse commandline arguments as '-name <username> -ip <ip address> -server <port>'
 	name := flag.String("name", "Anonymous", "The name of the user")
 	address := flag.String("ip", "localhost", "The ip address to the server")
-	port := flag.String("port", pb.Port, "The port on the ip address")
+	port := flag.String("port", utils.Port, "The port on the ip address")
 	flag.Parse()
 
-	// Create user
-	user = newUser(name)
+	log.Println("Starting client...")
+
+	user := newUser(name)
+
+	// Init close handler to handle signal interrupt
+	initCloseHandler(user)
 
 	// Print client welcome message
-	pb.ShowLogo()
+	utils.ShowLogo()
 	fmt.Printf("Welcome, %v!\n", user.Name)
 	fmt.Println()
 
@@ -52,9 +58,13 @@ func main() {
 	}
 	defer conn.Close()
 
-	// Create client stub to perform RPCs
-	client = pb.NewBroadcastClient(conn)
+	// Create client stub to perform RPCs and create message stream
+	client = pb.NewChittyChatClient(conn)
 	connect(user)
+
+	fmt.Println()
+	fmt.Println("Type '/help' to show a list of commands.")
+	fmt.Println(utils.Line)
 
 	wait.Add(1)
 	go startCommandShell(user)
@@ -68,40 +78,40 @@ func main() {
 
 // Creates a message stream to the server
 func connect(user *pb.User) {
-	fmt.Println("Connecting to server...")
-	stream, err := client.CreateStream(context.Background(), &pb.Connect{
-		User:   user,
-		Active: true,
-	})
-
 	t++
+
+	fmt.Println("Connecting to server...")
+	stream, err := client.CreateStream(context.Background(), &pb.ConnectRequest{
+		User:    user,
+		Lamport: t,
+	})
 
 	if err != nil {
 		log.Fatalf("Connection failed. :: %v", err)
 	}
 
 	fmt.Println("Done.")
-	fmt.Println()
-	fmt.Println("Type '/help' to show a list of commands.")
-	fmt.Println(pb.Line)
 	wait.Add(1)
-	go receiveMessage(stream)
+	go receiveMessages(stream)
 }
 
 // Disconnect client and end process
 func exit(user *pb.User) {
-	fmt.Println(pb.Line)
-	log.Println("Exitting client...")
+	fmt.Println(utils.Line)
+	fmt.Println("Disconnecting from server...")
 	t++
-	client.DisconnectStream(context.Background(), &pb.Message{
-		User: user,
-		Content: "Exit request",
-		Timestamp: time.Now().String(),
+	_, err := client.DisconnectStream(context.Background(), &pb.DisconnectRequest{
+		User:    user,
 		Lamport: t,
 	})
-	
-	log.Println("Done.")
-	fmt.Println(pb.Line)
+
+	if err != nil {
+		log.Printf("Failed to disconnect. :: %v", err)
+		return
+	}
+
+	fmt.Println("Done.")
+	fmt.Println(utils.Line)
 	close(done)
 }
 
@@ -118,20 +128,25 @@ func startCommandShell(user *pb.User) {
 			switch input {
 			case "/exit":
 				exit(user)
+				continue
 			case "/help":
-				pb.Help()
+				utils.Help()
+				continue
+			case "/info":
+				utils.PrintClientInfo(user, t)
 				continue
 			default:
 				fmt.Println("Unknown command. Type /help to show a list of commands.")
 				continue
 			}
-		} else if len(input) > pb.MaxMsgLength {
-			fmt.Printf("Error: Exceeding maximum message length of %v characters :: length: %v\n", pb.MaxMsgLength, len(input))
+		} else if len(input) > utils.MaxMsgLength {
+			fmt.Printf("Error: Exceeding maximum message length of %v characters :: length: %v\n", utils.MaxMsgLength, len(input))
 			continue
 		}
 
 		err := sendMessage(user, input)
 		if err != nil {
+			log.Println(err)
 			break
 		}
 	}
@@ -160,7 +175,7 @@ func sendMessage(user *pb.User, content string) error {
 }
 
 // Receive messages and print them to the console.
-func receiveMessage(stream pb.Broadcast_CreateStreamClient) {
+func receiveMessages(stream pb.ChittyChat_CreateStreamClient) {
 	defer wait.Done()
 
 	for {
@@ -176,13 +191,21 @@ func receiveMessage(stream pb.Broadcast_CreateStreamClient) {
 		} else {
 			log.Printf("(S-Broadcast: %v) %v: %s\n", msg.Lamport, msg.User.Name, msg.Content)
 		}
-		
 
-		t = pb.MaxLamport(msg.Lamport, t) + 1
+		t = utils.MaxLamport(msg.Lamport, t) + 1
 	}
 }
 
-// Create and return a User with an unique id, a specified name and password.
+func initCloseHandler(user *pb.User) {
+	c := make(chan os.Signal)
+	signal.Notify(c, os.Interrupt, syscall.SIGTERM)
+	go func() {
+		<-c
+		exit(user)
+	}()
+}
+
+// Creates and returns a User with an unique id and a specified name.
 func newUser(name *string) *pb.User {
 	id := sha256.Sum256([]byte(time.Now().String() + *name))
 	return &pb.User{

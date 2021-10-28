@@ -4,10 +4,6 @@ option go_package = "./chatpb";
 
 package ChittyChat;
 
-// Tutorial:
-// https://medium.com/@viethapascal/golang-grpc-part-2-simple-chat-application-with-grpc-ef6a6c0eea32
-// https://www.youtube.com/watch?v=mML6GiOAM1w
-
 // Install libraries
 // go install google.golang.org/protobuf/cmd/protoc-gen-go@latest
 // go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@latest
@@ -22,23 +18,28 @@ message User {
 }
 
 message Message {
-    User user = 1;
-    string content = 2;
-    string timestamp = 3;
+    User user = 1;          // Owner of message
+    string content = 2;     // Content of message
+    string timestamp = 3;   // Time stamp of message creation
+    int32 lamport = 4;      // Sender's current lamport clock
 }
 
-message Connect {
+message DisconnectRequest {
     User user = 1;
-    bool active = 2;
+    int32 lamport = 2;
+}
+
+message ConnectRequest {
+    User user = 1;
+    int32 lamport = 2;
 }
 
 message Close {}
 message Done {}
 
-service Broadcast {
-    rpc CreateStream (Connect) returns (stream Message);    // Initiate connection to BroadcastServer and return stream of messages.
-    rpc DisconnectStream (User) returns (Close);            // Disconnect user from stream.
-    rpc ConnectStream (User) returns (Done);                // Connect user to stream.
-    rpc Broadcast (Message) returns (Close);                // Send message to all users.
-    rpc Publish (Message) returns (Done);                   // Send message to server.
+service ChittyChat {
+    rpc CreateStream (ConnectRequest) returns (stream Message); // Initiate connection to BroadcastServer and return stream of messages.
+    rpc DisconnectStream (DisconnectRequest) returns (Close);   // Disconnect user from stream.
+    rpc Broadcast (Message) returns (Done);                     // Send message to all users.
+    rpc Publish (Message) returns (Done);                       // Send message to server.
 }
