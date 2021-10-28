@@ -2,11 +2,11 @@
 
 ## How to run
 
-First run the Server, then Clients
+Remember first to run the Server, then run Clients
 
 ### Server
 
-To start the server, run ´server.go´ in its directory with:
+To start the server, run `server.go` in its directory with:
 > `go run .`
 
 The server can also be started with arguments to specify e.g. which port it has to be run on.
@@ -18,7 +18,9 @@ E.g. to run the server on port 5000 write:
 
 > `go run . -port 5000`
 
-If no argument is provided it will start on a standard port.
+If no argument is provided it will start on a standard port (in this case port 8080).
+
+---
 
 ### Client
 
@@ -28,28 +30,31 @@ To start a client, run `client.go` in its directory with:
 The client can also be started with arguments to specify e.g.
 
 - The display name of the client in chat
-- The password for the client
-- The ip address of the server the client connects to
-- The port the client have to connect through
+- The ip address of the server the client want to connect to
+- The port the server is running on
 
-> `go run . -name <name> -password <password> -ip <address> -port <port>`
+> `go run . -name <name> -ip <address> -port <port>`
 
-E.g. to create a client with the name "Agata", with password "123", ip address of server being 192.168.0.1 on port 5000, write:
-> `go run . -name Agata -password 123 -ip 192.168.0.1 -port 5000`
+E.g. to create a client with the name "Agata", connecting to a server with the ip address 192.168.0.1 running on port 5000, write:
+> `go run . -name Agata -ip 192.168.0.1 -port 5000`
 
-If no arguments are provided it will pick a standard name, password, and port. The ip address will be set to "localhost".
+If no arguments are provided it will pick a standard name (Anonymous), and port (8080). The ip address will be set to "localhost".
 
-### Script (Windows only)
+---
+
+### Run with Script (Windows only)
 
 Chitty-Chat can also be run with a PowerShell script for easy creation of server and clients.
 
-To run the predefined script run:
+To run the script, write the filename in PowerShell in the root directory of the project:
 > `run.ps1`
+
+This will create a server with 4 clients.
 
 You can also specify how many clients to connect to the server by writing:
 > `run.ps1 -p <number of clients>`
 
-If no argument is provided it will start the server with 4 clients.
+If no argument is provided it will start the server with 4 clients as default.
 
 ---
 

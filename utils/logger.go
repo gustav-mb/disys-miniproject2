@@ -28,11 +28,19 @@ func (l *Logger) PrintlnBoth(text string) {
 	log.Println(text)
 }
 
-func (l *Logger) PrintlnNormal(text string) {
+func (l *Logger) Println(text string) {
 	l.Logln(text)
 	fmt.Println(text)
 }
 
 func (l *Logger) Logln(text string) {
 	l.Log.Println(text)
+}
+
+func (l *Logger) logf(text string, v ...interface{}) {
+	l.Log.Printf(text, v...)
+}
+
+func (l *Logger) logFatalf(text string, v ...interface{}) {
+	l.Log.Fatalf(text, v...)
 }
