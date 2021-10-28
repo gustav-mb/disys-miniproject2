@@ -1,10 +1,6 @@
 package utils
 
-import (
-	pb "chatpb"
-	fmt "fmt"
-	"time"
-)
+import fmt "fmt"
 
 const Port = "8080"
 const MaxMsgLength = 128
@@ -21,15 +17,6 @@ func ShowLogo() {
 	fmt.Println("                          __/ |                       ")
 	fmt.Println("                         |___/                        ")
 	fmt.Println(Line)
-}
-
-func NewMessage(user *pb.User, content string, lamport int32) *pb.Message {
-	return &pb.Message{
-		User: user,
-		Content: content,
-		Timestamp: time.Now().String(),
-		Lamport: lamport,
-	}
 }
 
 func MaxLamport(x, y int32) int32 {

@@ -24,6 +24,11 @@ var client pb.ChittyChatClient
 var wait *sync.WaitGroup
 var done chan int
 
+// Flags
+var name = flag.String("name", "Anonymous", "The name of the user")
+var address = flag.String("ip", "localhost", "The ip address to the server")
+var port = flag.String("port", utils.Port, "The port on the ip address")
+
 // Lamport clock
 var t int32
 
@@ -34,9 +39,6 @@ func init() {
 
 func main() {
 	// Parse commandline arguments as '-name <username> -ip <ip address> -server <port>'
-	name := flag.String("name", "Anonymous", "The name of the user")
-	address := flag.String("ip", "localhost", "The ip address to the server")
-	port := flag.String("port", utils.Port, "The port on the ip address")
 	flag.Parse()
 
 	log.Println("Starting client...")
@@ -135,6 +137,9 @@ func startCommandShell(user *pb.User) {
 			case "/info":
 				utils.PrintClientInfo(user, t)
 				continue
+			case "/server":
+				utils.PrintServerInfo(*address, *port)
+				continue
 			default:
 				fmt.Println("Unknown command. Type /help to show a list of commands.")
 				continue
@@ -196,6 +201,7 @@ func receiveMessages(stream pb.ChittyChat_CreateStreamClient) {
 	}
 }
 
+// Sets a close handler for abrupt session interruption.
 func initCloseHandler(user *pb.User) {
 	c := make(chan os.Signal)
 	signal.Notify(c, os.Interrupt, syscall.SIGTERM)

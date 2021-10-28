@@ -1,8 +1,8 @@
 package utils
 
 import (
-	fmt "fmt"
 	pb "chatpb"
+	fmt "fmt"
 )
 
 type Command struct {
@@ -10,9 +10,10 @@ type Command struct {
 	Description string
 }
 
-var Commands = [3]*Command{
+var Commands = [4]*Command{
 	{"help", "Shows all available commands."},
-	{"info", "Shows the current information about the client."},
+	{"info", "Shows information about the client."},
+	{"server", "Shows information about the server"},
 	{"exit", "Disconnect from server and exit client."},
 }
 
@@ -36,5 +37,13 @@ func PrintClientInfo(user *pb.User, lamport int32) {
 	fmt.Println("ID:", user.Id)
 	fmt.Println("Username:", user.Name)
 	fmt.Println("Lamport clock:", lamport)
+	fmt.Println(Line)
+}
+
+func PrintServerInfo(address, port string) {
+	fmt.Println(Line)
+	fmt.Println("SERVER INFO")
+	fmt.Println("IP:", address)
+	fmt.Println("Port:", port)
 	fmt.Println(Line)
 }
