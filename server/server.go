@@ -19,6 +19,7 @@ import (
 )
 
 var grpcServer *grpc.Server
+var service *server
 
 // Lamport clock
 var t int32
@@ -69,7 +70,7 @@ func main() {
 	log.Println("Done.")
 
 	<-done
-	shutdown()
+	service.shutdown()
 }
 
 // Initialize all dependencies for the gRPC server.
@@ -85,10 +86,10 @@ func initServer(port *string) net.Listener {
 	grpcServer = grpc.NewServer()
 
 	// Create chat service instance
-	server := &server{connections: make([]*connection, 0)}
+	service = &server{connections: make([]*connection, 0)}
 
 	// Register the server service on the grpc server
-	pb.RegisterChittyChatServer(grpcServer, server)
+	pb.RegisterChittyChatServer(grpcServer, service)
 
 	return listener
 }
@@ -145,7 +146,7 @@ func (s *server) setStreamActive(user *pb.User, active bool) error {
 		announcement = left
 	}
 
-	s.broadcastServerAnnouncement(s.getConnectionMessage(conn.user, announcement))
+	s.broadcastServerAnnouncement(fmt.Sprintf(announcement, conn.user.Name, t))
 
 	return nil
 }
@@ -232,8 +233,10 @@ func (s *server) findUser(id string) *connection {
 	return nil
 }
 
-// Shut down the server immediately
-func shutdown() {
+// Shuts down the server after 3 seconds
+func (s *server) shutdown() {
+	s.broadcastServerAnnouncement("WARNING: Server shutting down in 3 seconds! All users will be disconnected.")
+	time.Sleep(3 * time.Second)
 	fmt.Println(utils.Line)
 	log.Println("Shutting down server...")
 	grpcServer.Stop()
@@ -248,14 +251,9 @@ func initCloseHandler() {
 
 	go func() {
 		<-c
-		shutdown()
+		service.shutdown()
 		os.Exit(0)
 	}()
-}
-
-// Formats a connection message string and returns it.
-func (s *server) getConnectionMessage(user *pb.User, announcement string) string {
-	return fmt.Sprintf(announcement, user.Name, t)
 }
 
 // Create new connection
