@@ -236,9 +236,9 @@ func (s *server) findUser(id string) *connection {
 // Shuts down the server after 3 seconds
 func (s *server) shutdown() {
 	s.broadcastServerAnnouncement("WARNING: Server shutting down in 3 seconds! All users will be disconnected.")
-	time.Sleep(3 * time.Second)
 	fmt.Println(utils.Line)
-	log.Println("Shutting down server...")
+	log.Println("Shutting down server in 3 seconds...")
+	time.Sleep(3 * time.Second)
 	grpcServer.Stop()
 	log.Println("Done.")
 	fmt.Println(utils.Line)
