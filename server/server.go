@@ -5,7 +5,6 @@ import (
 	"context"
 	"flag"
 	"fmt"
-	"log"
 	"net"
 	"os"
 	"os/signal"
@@ -20,6 +19,8 @@ import (
 
 var grpcServer *grpc.Server
 var service *server
+var logger *utils.Logger
+var done chan int
 
 // Lamport clock
 var t int32
@@ -52,7 +53,10 @@ func main() {
 	port := flag.String("port", utils.Port, "The port the server has to run on")
 	flag.Parse()
 
-	done := make(chan int)
+	logger = utils.NewLogger("server")
+	logger.WarningLogger.Println("SERVER STARTED.")
+
+	done = make(chan int)
 
 	// Init close handler to handle signal interrupt
 	initCloseHandler()
@@ -65,21 +69,21 @@ func main() {
 	defer listener.Close()
 
 	// Start server
-	log.Println("Starting Chitty-Chat server...")
+	logger.InfoPrintln("Starting Chitty-Chat server...")
 	go startServer(listener)
-	log.Println("Done.")
+	logger.InfoPrintln("Chitty-Chat server started.")
 
 	<-done
-	service.shutdown()
+	logger.WarningLogger.Println("SERVER ENDED.")
 }
 
 // Initialize all dependencies for the gRPC server.
 func initServer(port *string) net.Listener {
 	// Init listener
-	log.Printf("Listening at port: " + *port)
+	logger.InfoPrintln("Listening at port:", *port)
 	listener, err := net.Listen("tcp", ":"+*port)
 	if err != nil {
-		log.Fatalf("Could not listen at port %v :: %v", port, err)
+		logger.ErrorFatalf("Could not listen at port %v. :: %v", *port, err)
 	}
 
 	// Create gRPC server instance
@@ -98,28 +102,34 @@ func initServer(port *string) net.Listener {
 func startServer(listener net.Listener) {
 	err := grpcServer.Serve(listener)
 	if err != nil {
-		log.Fatalf("Failed to start gRPC server. :: %v", err)
+		logger.ErrorFatalf("Failed to start gRPC server. :: %v", err)
 	}
 }
 
 // Create a connection from Server to a Client and store the connection in the server service.
 func (s *server) CreateStream(cr *pb.ConnectRequest, stream pb.ChittyChat_CreateStreamServer) error {
-	// Adjust lamport clock
 	t = utils.MaxLamport(t, 1) + 1
-	log.Printf("(%v, Receive) Connection request received from '%v'", t, cr.User.Name)
+
+	logger.InfoPrintf("(%v, Receive) Connection request received from '%v'", t, cr.User.Name)
 
 	connection := newConnection(cr.User.Id, stream, cr.User)
 
-	// Append connection to array and sort connections array by id
-	s.connections = append(s.connections, connection)
-	sort.SliceStable(s.connections, func(i, j int) bool {
-		return s.connections[i].id < s.connections[j].id
-	})
+	// Add connection to array
+	s.addConnection(connection)
 
 	// Set connection to active and broadcast join
 	s.setStreamActive(connection.user, true)
 
 	return <-connection.error
+}
+
+// Set a user's connection to inactive
+func (s *server) DisconnectStream(ctx context.Context, dr *pb.DisconnectRequest) (*pb.Close, error) {
+	t = utils.MaxLamport(t, dr.Lamport) + 1
+
+	logger.InfoPrintf("(%v, Receive) Disconnect request received from '%v'", t, dr.User.Name)
+
+	return &pb.Close{}, s.setStreamActive(dr.User, false)
 }
 
 // Set a connection to active (true) or inactive (false) for a client.
@@ -151,17 +161,9 @@ func (s *server) setStreamActive(user *pb.User, active bool) error {
 	return nil
 }
 
-// Set a user's connection to inactive
-func (s *server) DisconnectStream(ctx context.Context, dr *pb.DisconnectRequest) (*pb.Close, error) {
-	t = utils.MaxLamport(t, dr.Lamport) + 1
-	log.Printf("(%v, Receive) Disconnect request received from '%v'", t, dr.User.Name)
-
-	return &pb.Close{}, s.setStreamActive(dr.User, false)
-}
-
 // Recieve message from client and broadcast it to all clients.
 func (s *server) Publish(ctx context.Context, msg *pb.Message) (*pb.Done, error) {
-	log.Printf("(%v, Receive), Received message '%v' from participant '%v'", msg.Lamport, msg.Content, msg.User.Name)
+	logger.InfoPrintf("(%v, Receive) Received published message '%v' from participant '%v'", msg.Lamport, msg.Content, msg.User.Name)
 
 	t = utils.MaxLamport(t, msg.Lamport) + 1
 	t++
@@ -176,7 +178,7 @@ func (s *server) Publish(ctx context.Context, msg *pb.Message) (*pb.Done, error)
 // Broadcast a message to all clients on the server.
 func (s *server) Broadcast(ctx context.Context, msg *pb.Message) (*pb.Done, error) {
 	wait := sync.WaitGroup{}
-	done := make(chan int)
+	doneSending := make(chan int)
 
 	// Send message to each client connection
 	for _, conn := range s.connections {
@@ -187,10 +189,10 @@ func (s *server) Broadcast(ctx context.Context, msg *pb.Message) (*pb.Done, erro
 
 			if conn.active {
 				err := conn.stream.Send(msg)
-				log.Printf("(%v, Send) Broadcasting message '%v' to '%v'", msg.Lamport, msg.Content, conn.user.Name)
+				logger.InfoPrintf("(%v, Send) Broadcasting message '%v' from '%v' to '%v'", msg.Lamport, msg.Content, msg.User.Name, conn.user.Name)
 
 				if err != nil {
-					log.Printf("Error with stream %v. :: %v", conn.stream, err)
+					logger.ErrorPrintf("Error with stream %v. :: %v", conn.stream, err)
 					conn.active = false
 					conn.error <- err
 				}
@@ -200,23 +202,17 @@ func (s *server) Broadcast(ctx context.Context, msg *pb.Message) (*pb.Done, erro
 
 	go func() {
 		wait.Wait()
-		close(done)
+		close(doneSending)
 	}()
 
-	<-done
+	<-doneSending
 	return &pb.Done{}, nil
 }
 
 // Broadcast a server announcement to all clients.
 func (s *server) broadcastServerAnnouncement(msg string) {
 	t++
-
-	s.Broadcast(context.Background(), &pb.Message{
-		User:      &pb.User{Id: "S", Name: ">> Server"},
-		Content:   msg,
-		Timestamp: time.Now().String(),
-		Lamport:   t,
-	})
+	s.Broadcast(context.Background(), newMessage(msg))
 }
 
 // Looks up and returns a connection equal to the provided id in the Server service using binary search.
@@ -236,12 +232,20 @@ func (s *server) findUser(id string) *connection {
 // Shuts down the server after 3 seconds
 func (s *server) shutdown() {
 	s.broadcastServerAnnouncement("WARNING: Server shutting down in 3 seconds! All users will be disconnected.")
-	fmt.Println(utils.Line)
-	log.Println("Shutting down server in 3 seconds...")
+	logger.WarningPrintln("Shutting down server in 3 seconds...")
 	time.Sleep(3 * time.Second)
 	grpcServer.Stop()
-	log.Println("Done.")
+	logger.WarningPrintln("Server shutdown successfully.")
 	fmt.Println(utils.Line)
+	close(done)
+}
+
+// Adds a connection to the connections array and sorts it by id.
+func (s *server) addConnection(c *connection) {
+	s.connections = append(s.connections, c)
+	sort.SliceStable(s.connections, func(i, j int) bool {
+		return s.connections[i].id < s.connections[j].id
+	})
 }
 
 // Sets a close handler for abrupt session interruption.
@@ -252,11 +256,10 @@ func initCloseHandler() {
 	go func() {
 		<-c
 		service.shutdown()
-		os.Exit(0)
 	}()
 }
 
-// Create new connection
+// Create new connection.
 func newConnection(id string, stream pb.ChittyChat_CreateStreamServer, user *pb.User) *connection {
 	return &connection{
 		id:     id,
@@ -264,5 +267,15 @@ func newConnection(id string, stream pb.ChittyChat_CreateStreamServer, user *pb.
 		user:   user,
 		active: false,
 		error:  make(chan error),
+	}
+}
+
+// Create new message.
+func newMessage(content string) *pb.Message {
+	return &pb.Message{
+		User:      &pb.User{Id: "S", Name: ">> Server"},
+		Content:   content,
+		Timestamp: time.Now().Format("02-01-2006 15:04:05"),
+		Lamport:   t,
 	}
 }

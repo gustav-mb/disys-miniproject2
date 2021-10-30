@@ -8,7 +8,6 @@ import (
 	"encoding/hex"
 	"flag"
 	"fmt"
-	"log"
 	"os"
 	"os/signal"
 	"strings"
@@ -23,6 +22,7 @@ import (
 var client pb.ChittyChatClient
 var wait *sync.WaitGroup
 var done chan int
+var logger *utils.Logger
 
 // Flags
 var name = flag.String("name", "Anonymous", "The name of the user")
@@ -38,12 +38,14 @@ func init() {
 }
 
 func main() {
-	// Parse commandline arguments as '-name <username> -ip <ip address> -server <port>'
+	// Parse commandline arguments as '-name <username> -ip <ip address> -port <port>'
 	flag.Parse()
 
-	log.Println("Starting client...")
-
 	user := newUser(name)
+
+	// Create logger
+	logger = utils.NewLogger("client_" + *name + "_" + user.Id)
+	logger.WarningLogger.Println("CLIENT STARTED WITH ID", user.Id)
 
 	// Init close handler to handle signal interrupt
 	initCloseHandler(user)
@@ -54,19 +56,17 @@ func main() {
 	fmt.Println()
 
 	// Connect Client to Server
+	logger.InfoLogger.Printf("Connecting to server with ip address: %v:%v...", *address, *port)
 	conn, err := grpc.Dial(*address+":"+*port, grpc.WithInsecure())
 	if err != nil {
-		log.Fatalf("Could not connect to server. :: %v", err)
+		logger.ErrorLogger.Fatalf("Could not connect to server. :: %v", err)
 	}
 	defer conn.Close()
 
 	// Create client stub to perform RPCs and create message stream
 	client = pb.NewChittyChatClient(conn)
 	connect(user)
-
-	fmt.Println()
-	fmt.Println("Type '/help' to show a list of commands.")
-	fmt.Println(utils.Line)
+	logger.InfoLogger.Println("Connection established.")
 
 	wait.Add(1)
 	go startCommandShell(user)
@@ -76,50 +76,68 @@ func main() {
 	}()
 
 	<-done
+	fmt.Println(utils.Line)
+	fmt.Println("Exitting Chitty-Chat.")
+	fmt.Printf("See you later, %v!\n", user.Name)
+	fmt.Println(utils.Line)
+	logger.WarningLogger.Println("CLIENT ENDED.")
 }
 
 // Creates a message stream to the server
 func connect(user *pb.User) {
+	fmt.Println("Connecting to server...")
 	t++
 
-	fmt.Println("Connecting to server...")
+	logger.InfoLogger.Printf("(%v, Send) Sending connect request to server", t)
 	stream, err := client.CreateStream(context.Background(), &pb.ConnectRequest{
 		User:    user,
 		Lamport: t,
 	})
 
 	if err != nil {
-		log.Fatalf("Connection failed. :: %v", err)
+		fmt.Println("Connection failed.")
+		logger.ErrorLogger.Printf("Connection failed. :: %v", err)
+		close(done)
+		return
 	}
+	fmt.Println("Connected successfully.")
 
-	fmt.Println("Done.")
 	wait.Add(1)
 	go receiveMessages(stream)
 }
 
 // Disconnect client and end process
 func exit(user *pb.User) {
+	t++
+
+	logger.InfoLogger.Println("Disconnecting from server...")
+	logger.InfoLogger.Printf("(%v, Send) Sending disconnect request to server", t)
 	fmt.Println(utils.Line)
 	fmt.Println("Disconnecting from server...")
-	t++
+
 	_, err := client.DisconnectStream(context.Background(), &pb.DisconnectRequest{
 		User:    user,
 		Lamport: t,
 	})
 
 	if err != nil {
-		log.Printf("Failed to disconnect. :: %v", err)
+		logger.ErrorLogger.Printf("Failed to disconnect. :: %v", err)
 		return
 	}
+	logger.InfoLogger.Println("Disconnected successfully.")
 
-	fmt.Println("Done.")
-	fmt.Println(utils.Line)
+	fmt.Println("Disconnected successfully.")
+
 	close(done)
 }
 
 // Handle user input and send message, if not a command, to the server.
 func startCommandShell(user *pb.User) {
 	defer wait.Done()
+
+	fmt.Println()
+	fmt.Println("Type '/help' to show a list of commands.")
+	fmt.Println(utils.Line)
 
 	scanner := bufio.NewScanner(os.Stdin)
 
@@ -151,7 +169,7 @@ func startCommandShell(user *pb.User) {
 
 		err := sendMessage(user, input)
 		if err != nil {
-			log.Println(err)
+			logger.ErrorLogger.Println(err)
 			break
 		}
 	}
@@ -159,17 +177,11 @@ func startCommandShell(user *pb.User) {
 
 // Publish message to server.
 func sendMessage(user *pb.User, content string) error {
-	msg := &pb.Message{
-		User:      user,
-		Content:   content,
-		Timestamp: time.Now().String(),
-		Lamport:   t,
-	}
+	logger.InfoLogger.Printf("(%v, Send) Publishing message '%v' to server\n", t, content)
 
-	log.Printf("(%v, Send) Publishing message '%v' to server\n", msg.Lamport, msg.Content)
+	t++
 
-	msg.Lamport++
-
+	msg := newMessage(user, content)
 	_, err := client.Publish(context.Background(), msg)
 
 	if err != nil {
@@ -187,15 +199,18 @@ func receiveMessages(stream pb.ChittyChat_CreateStreamClient) {
 		msg, err := stream.Recv()
 
 		if err != nil {
-			log.Fatalf("Error reading message. :: %v", err)
+			logger.ErrorPrintf("Error reading messages. :: %v", err)
+			close(done)
 			break
 		}
 
 		if t == 1 {
-			log.Printf("(C-Send: %v | S-Broadcast: %v) %v: %s\n", t, msg.Lamport, msg.User.Name, msg.Content)
+			logger.InfoLogger.Printf("(C-Send: %v | S-Broadcast: %v) %v: %s\n", t, msg.Lamport, msg.User.Name, msg.Content)
 		} else {
-			log.Printf("(S-Broadcast: %v) %v: %s\n", msg.Lamport, msg.User.Name, msg.Content)
+			logger.InfoLogger.Printf("(S-Broadcast: %v) %v: %s\n", msg.Lamport, msg.User.Name, msg.Content)
 		}
+
+		fmt.Printf("[%v] %v: %s\n", msg.Timestamp, msg.User.Name, msg.Content)
 
 		t = utils.MaxLamport(msg.Lamport, t) + 1
 	}
@@ -217,5 +232,15 @@ func newUser(name *string) *pb.User {
 	return &pb.User{
 		Id:   hex.EncodeToString(id[:]),
 		Name: *name,
+	}
+}
+
+// Creates a new message and returns it.
+func newMessage(user *pb.User, content string) *pb.Message {
+	return &pb.Message{
+		User:      user,
+		Content:   content,
+		Timestamp: time.Now().Format("02-01-2006 15:04:05"),
+		Lamport:   t,
 	}
 }
