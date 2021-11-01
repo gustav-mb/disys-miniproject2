@@ -66,7 +66,6 @@ func main() {
 	// Create client stub to perform RPCs and create message stream
 	client = pb.NewChittyChatClient(conn)
 	connect(user)
-	logger.InfoLogger.Println("Connection established.")
 
 	wait.Add(1)
 	go startCommandShell(user)
@@ -100,6 +99,7 @@ func connect(user *pb.User) {
 		close(done)
 		return
 	}
+	logger.InfoLogger.Println("Connection established.")
 	fmt.Println("Connected successfully.")
 
 	wait.Add(1)
