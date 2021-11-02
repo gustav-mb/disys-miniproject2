@@ -1,8 +1,8 @@
 package utils
 
 import (
-	pb "github.com/gustav-mb/disys-miniproject2/chatpb"
-	fmt "fmt"
+	pb "chatpb"
+	"fmt"
 )
 
 type Command struct {
@@ -17,7 +17,7 @@ var Commands = [4]*Command{
 	{"exit", "Disconnect from server and exit client."},
 }
 
-// Prints a list of available commands
+// Help Prints a list of available commands
 func Help() {
 	fmt.Println(Line)
 	fmt.Println("HELP")
@@ -30,7 +30,7 @@ func Help() {
 	fmt.Println(Line)
 }
 
-// Prints the current client info to the console.
+// PrintClientInfo Prints the current client info to the console.
 func PrintClientInfo(user *pb.User, lamport int32) {
 	fmt.Println(Line)
 	fmt.Println("Client INFO")

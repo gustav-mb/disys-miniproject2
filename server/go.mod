@@ -1,18 +1,22 @@
-module github.com/gustav-mb/disys-miniproject2/server
+module server
 
 go 1.17
 
+replace chatpb => ../chatpb
+
+replace utils => ../utils
+
 require (
-	github.com/gustav-mb/disys-miniproject2/chatpb v0.0.0-20211102075033-e6ef6e6d5ca6
-	github.com/gustav-mb/disys-miniproject2/utils v0.0.0-20211102075033-e6ef6e6d5ca6
+	chatpb v0.0.0-00010101000000-000000000000
 	google.golang.org/grpc v1.41.0
+	utils v0.0.0-00010101000000-000000000000
 )
 
 require (
-	github.com/golang/protobuf v1.4.3 // indirect
+	github.com/golang/protobuf v1.5.0 // indirect
 	golang.org/x/net v0.0.0-20200822124328-c89045814202 // indirect
 	golang.org/x/sys v0.0.0-20200323222414-85ca7c5b95cd // indirect
 	golang.org/x/text v0.3.0 // indirect
 	google.golang.org/genproto v0.0.0-20200526211855-cb27e3aa2013 // indirect
-	google.golang.org/protobuf v1.25.0 // indirect
+	google.golang.org/protobuf v1.27.1 // indirect
 )

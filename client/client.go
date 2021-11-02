@@ -2,19 +2,20 @@ package main
 
 import (
 	"bufio"
+	pb "chatpb"
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
 	"flag"
 	"fmt"
-	pb "github.com/gustav-mb/disys-miniproject2/chatpb"
-	utils "github.com/gustav-mb/disys-miniproject2/utils"
+	"log"
 	"os"
 	"os/signal"
 	"strings"
 	"sync"
 	"syscall"
 	"time"
+	"utils"
 
 	"google.golang.org/grpc"
 )
@@ -23,18 +24,17 @@ var client pb.ChittyChatClient
 var wait *sync.WaitGroup
 var done chan int
 var logger *utils.Logger
+var t *utils.Lamport
 
 // Flags
 var name = flag.String("name", "Anonymous", "The name of the user")
 var address = flag.String("ip", "localhost", "The ip address to the server")
 var port = flag.String("port", utils.Port, "The port on the ip address")
 
-// Lamport clock
-var t int32
-
 func init() {
 	wait = &sync.WaitGroup{}
 	done = make(chan int)
+	t = &utils.Lamport{T: 0}
 }
 
 func main() {
@@ -61,7 +61,12 @@ func main() {
 	if err != nil {
 		logger.ErrorLogger.Fatalf("Could not connect to server. :: %v", err)
 	}
-	defer conn.Close()
+	defer func(conn *grpc.ClientConn) {
+		err := conn.Close()
+		if err != nil {
+			log.Fatalf("Unknown error. :: %v", err)
+		}
+	}(conn)
 
 	// Create client stub to perform RPCs and create message stream
 	client = pb.NewChittyChatClient(conn)
@@ -76,7 +81,7 @@ func main() {
 
 	<-done
 	fmt.Println(utils.Line)
-	fmt.Println("Exitting Chitty-Chat.")
+	fmt.Println("Exiting Chitty-Chat.")
 	fmt.Printf("See you later, %v!\n", user.Name)
 	fmt.Println(utils.Line)
 	logger.WarningLogger.Println("CLIENT ENDED.")
@@ -85,12 +90,12 @@ func main() {
 // Creates a message stream to the server
 func connect(user *pb.User) {
 	fmt.Println("Connecting to server...")
-	t++
+	t.Increment()
 
-	logger.InfoLogger.Printf("(%v, Send) Sending connect request to server", t)
+	logger.InfoLogger.Printf("(%v, Send) Sending connect request to server", t.T)
 	stream, err := client.CreateStream(context.Background(), &pb.ConnectRequest{
 		User:    user,
-		Lamport: t,
+		Lamport: t.T,
 	})
 
 	if err != nil {
@@ -108,16 +113,16 @@ func connect(user *pb.User) {
 
 // Disconnect client and end process
 func exit(user *pb.User) {
-	t++
+	t.Increment()
 
 	logger.InfoLogger.Println("Disconnecting from server...")
-	logger.InfoLogger.Printf("(%v, Send) Sending disconnect request to server", t)
+	logger.InfoLogger.Printf("(%v, Send) Sending disconnect request to server", t.T)
 	fmt.Println(utils.Line)
 	fmt.Println("Disconnecting from server...")
 
 	_, err := client.DisconnectStream(context.Background(), &pb.DisconnectRequest{
 		User:    user,
-		Lamport: t,
+		Lamport: t.T,
 	})
 
 	if err != nil {
@@ -153,7 +158,7 @@ func startCommandShell(user *pb.User) {
 				utils.Help()
 				continue
 			case "/info":
-				utils.PrintClientInfo(user, t)
+				utils.PrintClientInfo(user, t.T)
 				continue
 			case "/server":
 				utils.PrintServerInfo(*address, *port)
@@ -177,12 +182,12 @@ func startCommandShell(user *pb.User) {
 
 // Publish message to server.
 func sendMessage(user *pb.User, content string) error {
-	logger.InfoLogger.Printf("(%v, Send) Publishing message '%v' to server\n", t, content)
-
-	t++
+	t.Increment() // Publish message
+	logger.InfoLogger.Printf("(%v, Send) Publishing message '%v' to server\n", t.T, content)
 
 	msg := newMessage(user, content)
-	_, err := client.Publish(context.Background(), msg)
+	done, err := client.Publish(context.Background(), msg)
+	t.MaxAndIncrement(done.Lamport) // Receive DONE
 
 	if err != nil {
 		return fmt.Errorf("error sending message. :: %v", err)
@@ -204,15 +209,15 @@ func receiveMessages(stream pb.ChittyChat_CreateStreamClient) {
 			break
 		}
 
-		if t == 1 {
-			logger.InfoLogger.Printf("(C-Send: %v | S-Broadcast: %v) %v: %s\n", t, msg.Lamport, msg.User.Name, msg.Content)
+		if t.T == 1 {
+			logger.InfoLogger.Printf("(C-Send: %v | S-Broadcast: %v) %v: %s\n", t.T, msg.Lamport, msg.User.Name, msg.Content)
 		} else {
 			logger.InfoLogger.Printf("(S-Broadcast: %v) %v: %s\n", msg.Lamport, msg.User.Name, msg.Content)
 		}
 
 		fmt.Printf("[%v] %v: %s\n", msg.Timestamp, msg.User.Name, msg.Content)
 
-		t = utils.MaxLamport(msg.Lamport, t) + 1
+		t.MaxAndIncrement(msg.Lamport)
 	}
 }
 
@@ -241,6 +246,6 @@ func newMessage(user *pb.User, content string) *pb.Message {
 		User:      user,
 		Content:   content,
 		Timestamp: time.Now().Format("02-01-2006 15:04:05"),
-		Lamport:   t,
+		Lamport:   t.T,
 	}
 }

@@ -1,8 +1,10 @@
-module github.com/gustav-mb/disys-miniproject2/utils
+module utils
 
 go 1.17
 
-require github.com/gustav-mb/disys-miniproject2/chatpb v0.0.0-20211102075033-e6ef6e6d5ca6
+replace chatpb => ../chatpb
+
+require chatpb v0.0.0-00010101000000-000000000000
 
 require (
 	github.com/golang/protobuf v1.5.0 // indirect

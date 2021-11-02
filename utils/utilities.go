@@ -1,6 +1,8 @@
 package utils
 
-import fmt "fmt"
+import (
+	"fmt"
+)
 
 const Port = "8080"
 const MaxMsgLength = 128
@@ -17,12 +19,4 @@ func ShowLogo() {
 	fmt.Println("                          __/ |                              ")
 	fmt.Println("                         |___/                               ")
 	fmt.Println(Line)
-}
-
-func MaxLamport(x, y int32) int32 {
-	if x < y {
-		return y
-	}
-
-	return x
 }

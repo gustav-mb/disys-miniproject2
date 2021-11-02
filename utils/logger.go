@@ -13,14 +13,14 @@ type Logger struct {
 	ErrorLogger   *log.Logger
 }
 
-// Prints both to the log file and to the console.
+// InfoPrintln Prints both to the log file and to the console.
 // Equals to calling Logger.InfoLogger.Println() and a normal log.println()
 func (l *Logger) InfoPrintln(v ...interface{}) {
 	l.InfoLogger.Println(v...)
 	log.Println(v...)
 }
 
-// Prints a formated string to both the log file and to the console.
+// InfoPrintf Prints a formated string to both the log file and to the console.
 // Equals to calling Logger.InfoLogger.Printf() and a normal log.printf()
 func (l *Logger) InfoPrintf(text string, v ...interface{}) {
 	l.InfoLogger.Printf(text, v...)
@@ -33,7 +33,7 @@ func (l *Logger) WarningPrintln(v ...interface{}) {
 }
 
 func (l *Logger) ErrorFatalf(text string, v ...interface{}) {
-	l.ErrorLogger.Fatalf(text, v...)
+	l.ErrorLogger.Printf(text, v...)
 	log.Fatalf(text, v...)
 }
 

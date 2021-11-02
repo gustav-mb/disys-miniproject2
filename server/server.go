@@ -1,11 +1,11 @@
 package main
 
 import (
+	pb "chatpb"
 	"context"
 	"flag"
 	"fmt"
-	pb "github.com/gustav-mb/disys-miniproject2/chatpb"
-	utils "github.com/gustav-mb/disys-miniproject2/utils"
+	"log"
 	"net"
 	"os"
 	"os/signal"
@@ -13,6 +13,7 @@ import (
 	"sync"
 	"syscall"
 	"time"
+	"utils"
 
 	"google.golang.org/grpc"
 )
@@ -23,7 +24,7 @@ var logger *utils.Logger
 var done chan int
 
 // Lamport clock
-var t int32
+var t = &utils.Lamport{T: 0}
 
 // Server announcements
 const (
@@ -46,6 +47,7 @@ type connection struct {
 type server struct {
 	pb.UnimplementedChittyChatServer
 	connections []*connection
+	mu sync.Mutex
 }
 
 func main() {
@@ -66,7 +68,12 @@ func main() {
 
 	// Init server
 	listener := initServer(port)
-	defer listener.Close()
+	defer func(listener net.Listener) {
+		err := listener.Close()
+		if err != nil {
+			log.Fatalf("Unknown error. :: %v", err)
+		}
+	}(listener)
 
 	// Start server
 	logger.InfoPrintln("Starting Chitty-Chat server...")
@@ -106,11 +113,11 @@ func startServer(listener net.Listener) {
 	}
 }
 
-// Create a connection from Server to a Client and store the connection in the server service.
+// CreateStream Create a connection from Server to a Client and store the connection in the server service.
 func (s *server) CreateStream(cr *pb.ConnectRequest, stream pb.ChittyChat_CreateStreamServer) error {
-	t = utils.MaxLamport(t, 1) + 1
+	t.MaxAndIncrement(1)
 
-	logger.InfoPrintf("(%v, Receive) Connection request received from '%v'", t, cr.User.Name)
+	logger.InfoPrintf("(%v, Receive) Connection request received from '%v'", t.T, cr.User.Name)
 
 	connection := newConnection(cr.User.Id, stream, cr.User)
 
@@ -123,11 +130,11 @@ func (s *server) CreateStream(cr *pb.ConnectRequest, stream pb.ChittyChat_Create
 	return <-connection.error
 }
 
-// Set a user's connection to inactive
-func (s *server) DisconnectStream(ctx context.Context, dr *pb.DisconnectRequest) (*pb.Close, error) {
-	t = utils.MaxLamport(t, dr.Lamport) + 1
+// DisconnectStream Set a user's connection to inactive
+func (s *server) DisconnectStream(_ context.Context, dr *pb.DisconnectRequest) (*pb.Close, error) {
+	t.MaxAndIncrement(dr.Lamport)
 
-	logger.InfoPrintf("(%v, Receive) Disconnect request received from '%v'", t, dr.User.Name)
+	logger.InfoPrintf("(%v, Receive) Disconnect request received from '%v'", t.T, dr.User.Name)
 
 	return &pb.Close{}, s.setStreamActive(dr.User, false)
 }
@@ -156,31 +163,28 @@ func (s *server) setStreamActive(user *pb.User, active bool) error {
 		announcement = left
 	}
 
-	s.broadcastServerAnnouncement(fmt.Sprintf(announcement, conn.user.Name, t))
+	s.broadcastServerAnnouncement(fmt.Sprintf(announcement, conn.user.Name, t.T))
 
 	return nil
 }
 
-// Recieve message from client and broadcast it to all clients.
+// Publish Receive message from client and broadcast it to all clients.
 func (s *server) Publish(ctx context.Context, msg *pb.Message) (*pb.Done, error) {
-	logger.InfoPrintf("(%v, Receive) Received published message '%v' from participant '%v'", msg.Lamport, msg.Content, msg.User.Name)
-
-	t = utils.MaxLamport(t, msg.Lamport) + 1
-	t++ // Broadcast
+	t.MaxAndIncrement(msg.Lamport)	// Receive Publish
+	logger.InfoPrintf("(%v, Receive) Received published message '%v' from participant '%v'", t.T, msg.Content, msg.User.Name)
+	t.Increment() // Broadcast
 
 	var message = msg
-	message.Lamport = t
+	message.Lamport = t.T
 	_, err := s.Broadcast(ctx, message)
 
-	t++
-	t := &pb.Done{
-		Lamport: t,
-	}
-	return &pb.Done{Lamport: t}, err
+	t.Increment() // Send Done back
+	logger.InfoLogger.Printf("(%v, Send) Sending back DONE.", t.T)
+	return &pb.Done{Lamport: t.T}, err
 }
 
 // Broadcast a message to all clients on the server.
-func (s *server) Broadcast(ctx context.Context, msg *pb.Message) (*pb.Done, error) {
+func (s *server) Broadcast(_ context.Context, msg *pb.Message) (*pb.Done, error) {
 	wait := sync.WaitGroup{}
 	doneSending := make(chan int)
 
@@ -215,7 +219,7 @@ func (s *server) Broadcast(ctx context.Context, msg *pb.Message) (*pb.Done, erro
 
 // Broadcast a server announcement to all clients.
 func (s *server) broadcastServerAnnouncement(msg string) {
-	t++
+	t.Increment()
 	s.Broadcast(context.Background(), newMessage(msg))
 }
 
@@ -246,6 +250,8 @@ func (s *server) shutdown() {
 
 // Adds a connection to the connections array and sorts it by id.
 func (s *server) addConnection(c *connection) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	s.connections = append(s.connections, c)
 	sort.SliceStable(s.connections, func(i, j int) bool {
 		return s.connections[i].id < s.connections[j].id
@@ -263,7 +269,7 @@ func initCloseHandler() {
 	}()
 }
 
-// Create new connection.
+// Create a new connection.
 func newConnection(id string, stream pb.ChittyChat_CreateStreamServer, user *pb.User) *connection {
 	return &connection{
 		id:     id,
@@ -274,12 +280,12 @@ func newConnection(id string, stream pb.ChittyChat_CreateStreamServer, user *pb.
 	}
 }
 
-// Create new message.
+// Create a new server message.
 func newMessage(content string) *pb.Message {
 	return &pb.Message{
 		User:      &pb.User{Id: "S", Name: ">> Server"},
 		Content:   content,
 		Timestamp: time.Now().Format("02-01-2006 15:04:05"),
-		Lamport:   t,
+		Lamport:   t.T,
 	}
 }
