@@ -1,10 +1,11 @@
 package main
 
 import (
-	pb "github.com/gustav-mb/disys-miniproject2/chatpb"
 	"context"
 	"flag"
 	"fmt"
+	pb "github.com/gustav-mb/disys-miniproject2/chatpb"
+	utils "github.com/gustav-mb/disys-miniproject2/utils"
 	"net"
 	"os"
 	"os/signal"
@@ -12,7 +13,6 @@ import (
 	"sync"
 	"syscall"
 	"time"
-	utils "github.com/gustav-mb/disys-miniproject2/utils"
 
 	"google.golang.org/grpc"
 )
@@ -166,13 +166,17 @@ func (s *server) Publish(ctx context.Context, msg *pb.Message) (*pb.Done, error)
 	logger.InfoPrintf("(%v, Receive) Received published message '%v' from participant '%v'", msg.Lamport, msg.Content, msg.User.Name)
 
 	t = utils.MaxLamport(t, msg.Lamport) + 1
-	t++
+	t++ // Broadcast
 
 	var message = msg
 	message.Lamport = t
 	_, err := s.Broadcast(ctx, message)
 
-	return &pb.Done{}, err
+	t++
+	t := &pb.Done{
+		Lamport: t,
+	}
+	return &pb.Done{Lamport: t}, err
 }
 
 // Broadcast a message to all clients on the server.

@@ -2,19 +2,19 @@ package main
 
 import (
 	"bufio"
-	pb "github.com/gustav-mb/disys-miniproject2/chatpb"
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
 	"flag"
 	"fmt"
+	pb "github.com/gustav-mb/disys-miniproject2/chatpb"
+	utils "github.com/gustav-mb/disys-miniproject2/utils"
 	"os"
 	"os/signal"
 	"strings"
 	"sync"
 	"syscall"
 	"time"
-	utils "github.com/gustav-mb/disys-miniproject2/utils"
 
 	"google.golang.org/grpc"
 )

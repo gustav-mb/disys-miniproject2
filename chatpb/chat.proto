@@ -34,8 +34,13 @@ message ConnectRequest {
     int32 lamport = 2;
 }
 
-message Close {}
-message Done {}
+message Close {
+    int32 lamport = 1;
+}
+
+message Done {
+    int32 lamport = 1;
+}
 
 service ChittyChat {
     rpc CreateStream (ConnectRequest) returns (stream Message); // Initiate connection to BroadcastServer and return stream of messages.
