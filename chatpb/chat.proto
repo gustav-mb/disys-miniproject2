@@ -1,0 +1,45 @@
+syntax = "proto3";
+
+option go_package = "./chatpb";
+
+package ChittyChat;
+
+// Install libraries
+// go install google.golang.org/protobuf/cmd/protoc-gen-go@latest
+// go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@latest
+
+// Compile protofile with:
+// protoc -I="." --go_out="." "chatpb/chat.proto"
+// protoc --go-grpc_out="." chatpb/chat.proto
+
+message User {
+    string id = 1;
+    string name = 2;
+}
+
+message Message {
+    User user = 1;          // Owner of message
+    string content = 2;     // Content of message
+    string timestamp = 3;   // Time stamp of message creation
+    int32 lamport = 4;      // Sender's current lamport clock
+}
+
+message DisconnectRequest {
+    User user = 1;
+    int32 lamport = 2;
+}
+
+message ConnectRequest {
+    User user = 1;
+    int32 lamport = 2;
+}
+
+message Close {}
+message Done {}
+
+service ChittyChat {
+    rpc CreateStream (ConnectRequest) returns (stream Message); // Initiate connection to BroadcastServer and return stream of messages.
+    rpc DisconnectStream (DisconnectRequest) returns (Close);   // Disconnect user from stream.
+    rpc Broadcast (Message) returns (Done);                     // Send message to all users.
+    rpc Publish (Message) returns (Done);                       // Send message to server.
+}
