@@ -1,7 +1,7 @@
 package main
 
 import (
-	pb "chatpb"
+	pb "github.com/gustav-mb/disys-miniproject2/chatpb"
 	"context"
 	"flag"
 	"fmt"
@@ -12,7 +12,7 @@ import (
 	"sync"
 	"syscall"
 	"time"
-	utils "utils"
+	utils "github.com/gustav-mb/disys-miniproject2/utils"
 
 	"google.golang.org/grpc"
 )

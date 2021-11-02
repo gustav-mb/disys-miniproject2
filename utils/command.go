@@ -1,7 +1,7 @@
 package utils
 
 import (
-	pb "chatpb"
+	pb "github.com/gustav-mb/disys-miniproject2/chatpb"
 	fmt "fmt"
 )
 
